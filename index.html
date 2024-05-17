@@ -1,0 +1,228 @@
+<h1><!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingreso de Pedidos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f8ff;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .container {
+            width: 100%;
+            max-width: 600px;
+            background-color: #fff;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #333;
+            font-size: 1.5em;
+        }
+        .input-group {
+            margin-bottom: 15px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+        }
+        input[type="text"], select {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        .buttons {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            gap: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #28a745;
+            color: #fff;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            flex-grow: 1;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        button:hover:enabled {
+            background-color: #218838;
+        }
+        .order-summary, .overall-summary {
+            text-align: left;
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Ingreso de Pedidos</h1>
+    <div id="product-list">
+        <div class="input-group">
+            <label for="product">Ingrese productos</label>
+            <input type="text" id="product" name="product">
+        </div>
+        <div class="input-group">
+            <label for="quantity">Cantidad</label>
+            <select id="quantity" name="quantity">
+                <!-- Options from 1 to 1000 -->
+                <script>
+                    for (let i = 1; i <= 1000; i++) {
+                        document.write('<option value="' + i + '">' + i + '</option>');
+                    }
+                </script>
+            </select>
+        </div>
+        <div class="input-group">
+            <label for="price">Precio</label>
+            <input type="text" id="price" name="price">
+        </div>
+        <div class="input-group">
+            <label for="order-name-number">Nombre y número de pedido</label>
+            <input type="text" id="order-name-number" name="order-name-number">
+        </div>
+    </div>
+    <div class="buttons">
+        <button id="add-product">Agregar Producto</button>
+        <button id="finalize-order">Finalizar Pedido</button>
+        <button id="print-pdf" disabled>Imprimir/Descargar PDF</button>
+    </div>
+    <div id="result" class="order-summary"></div>
+    <div id="summary" class="overall-summary"></div>
+</div>
+
+<script>
+    const productList = document.getElementById('product-list');
+    const addProductButton = document.getElementById('add-product');
+    const finalizeOrderButton = document.getElementById('finalize-order');
+    const printPdfButton = document.getElementById('print-pdf');
+    const resultDiv = document.getElementById('result');
+    const summaryDiv = document.getElementById('summary');
+
+    let orderList = [];
+
+    function formatNumber(number) {
+        return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+    }
+
+    function normalizeString(str) {
+        return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    }
+
+    addProductButton.addEventListener('click', () => {
+        const product = document.getElementById('product').value;
+        const quantity = document.getElementById('quantity').value;
+        const price = document.getElementById('price').value;
+        const orderNameNumber = document.getElementById('order-name-number').value;
+        
+        if (product && quantity && price && orderNameNumber) {
+            orderList.push({ product, quantity, price, orderNameNumber });
+            document.getElementById('product').value = '';
+            document.getElementById('quantity').value = '1';
+            document.getElementById('price').value = '';
+            document.getElementById('order-name-number').value = '';
+        } else {
+            alert('Por favor, complete todos los campos.');
+        }
+    });
+
+    finalizeOrderButton.addEventListener('click', () => {
+        if (orderList.length > 0) {
+            let orders = {};
+            let grandTotalQuantity = 0;
+            let grandTotalPrice = 0;
+            let consolidatedOrders = {};
+
+            orderList.forEach(order => {
+                const key = order.orderNameNumber;
+                if (!orders[key]) {
+                    orders[key] = { name: key, products: [], totalQuantity: 0, totalPrice: 0 };
+                }
+                orders[key].products.push({ name: order.product, quantity: order.quantity, price: order.price });
+                orders[key].totalQuantity += parseInt(order.quantity);
+                orders[key].totalPrice += parseInt(order.quantity) * parseFloat(order.price);
+                grandTotalQuantity += parseInt(order.quantity);
+                grandTotalPrice += parseInt(order.quantity) * parseFloat(order.price);
+
+                const normalizedProduct = normalizeString(order.product);
+                if (!consolidatedOrders[normalizedProduct]) {
+                    consolidatedOrders[normalizedProduct] = { name: order.product, quantity: 0, totalPrice: 0 };
+                }
+                consolidatedOrders[normalizedProduct].quantity += parseInt(order.quantity);
+                consolidatedOrders[normalizedProduct].totalPrice += parseInt(order.quantity) * parseFloat(order.price);
+            });
+
+            let summaryHtml = '';
+            for (const order in orders) {
+                summaryHtml += `<h2>Pedido de ${orders[order].name}</h2>`;
+                summaryHtml += `<ul>`;
+                orders[order].products.forEach(product => {
+                    summaryHtml += `<li>${product.name} - Cantidad: ${product.quantity}, Precio: $${formatNumber(Math.round(product.price))}</li>`;
+                });
+                summaryHtml += `</ul>`;
+                summaryHtml += `<p>Total de productos: ${orders[order].totalQuantity}</p>`;
+                summaryHtml += `<p>Valor total: $${formatNumber(Math.round(orders[order].totalPrice))}</p>`;
+            }
+
+            let overallSummaryHtml = `<h2>Resumen General</h2>`;
+            overallSummaryHtml += `<table>`;
+            overallSummaryHtml += `<thead><tr><th>Producto</th><th>Cantidad</th><th>Precio total</th></tr></thead>`;
+            overallSummaryHtml += `<tbody>`;
+            for (const product in consolidatedOrders) {
+                overallSummaryHtml += `<tr><td>${consolidatedOrders[product].name}</td><td>${consolidatedOrders[product].quantity}</td><td>$${formatNumber(Math.round(consolidatedOrders[product].totalPrice))}</td></tr>`;
+            }
+            overallSummaryHtml += `</tbody></table>`;
+            overallSummaryHtml += `<p>Total de productos: ${grandTotalQuantity}</p>`;
+            overallSummaryHtml += `<p>Valor total: $${formatNumber(Math.round(grandTotalPrice))}</p>`;
+
+            resultDiv.innerHTML = summaryHtml;
+            summaryDiv.innerHTML = overallSummaryHtml;
+            printPdfButton.disabled = false;
+        } else {
+            alert('No hay productos en el pedido.');
+        }
+    });
+
+    printPdfButton.addEventListener('click', () => {
+        window.print();
+    });
+</script>
+
+</body>
+</html>
+</h1>
